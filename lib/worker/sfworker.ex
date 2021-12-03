@@ -5,7 +5,7 @@ defmodule SecretFriends.Worker.SFWorker do
   # start server
   def start_link(name) do
     # MFA (module - function - arguments)
-    GenServer.start_link(__MODULE__, {SFList.new(), nil}, name: name)
+    GenServer.start_link(__MODULE__, %{sflist: SFList.new(), selection: nil, lock: false}, name: name)
   end
 
   @impl GenServer
@@ -15,29 +15,51 @@ defmodule SecretFriends.Worker.SFWorker do
 
   # handle_cast (msg, state) -> {:noreply, new_state}
   @impl GenServer
-  @spec handle_cast({:add_friend, any}, {any, any}) ::
-          {:noreply, {nonempty_maybe_improper_list, nil}}
-  def handle_cast({:add_friend, friend}, {sflist, _selection} = _state) do
+  def handle_call({:add_friend, friend}, _from, %{sflist: sflist, lock: false} = state) do
     new_sflist = SFList.add_friend(sflist, friend)
     # invalidate previous selection when adding a friend
-    {:noreply, {new_sflist, nil}}
+    # use pipe operand to update sflist and selection keys of state dict
+    {:reply, :ok, %{state | sflist: new_sflist, selection: nil}}
+  end
+
+  # handle_cast (msg, state) -> {:noreply, new_state}
+  @impl GenServer
+  def handle_call({:add_friend, _friend}, _from, %{lock: true} = state) do
+    # when list is locked, the state remains
+    {:reply, :locked, state}
+  end
+
+  @impl GenServer
+  def handle_cast(:lock, state) do
+    {:noreply, %{state | lock: true}}
+  end
+
+  @impl GenServer
+  def handle_cast(:unlock, state) do
+    {:noreply, %{state | lock: false}}
   end
 
   # handle_call (msg, from, state) -> {:reply, response, new_state}
   @impl GenServer
-  def handle_call(:create_selection, _from, {sflist, nil} = _state) do
+  def handle_call(:create_selection, _from, %{sflist: sflist} = state) do
     new_selection = SFList.create_selection(sflist)
-    {:reply, new_selection, {sflist, new_selection}}
+    {:reply, new_selection, %{state | sflist: sflist, selection: new_selection}}
   end
 
   # handle_call (msg, from, state) -> {:reply, response, new_state}
   @impl GenServer
-  def handle_call(:create_selection, _from, {_sflist, selection} = state) do
+  def handle_call(:create_selection, _from, %{selection: selection} = state) do
     {:reply, selection, state}
   end
 
   @impl GenServer
-  def handle_call(:show, _from, {sflist, _selection} = state) do
+  def handle_call(:show, _from, %{sflist: sflist} = state) do
     {:reply, sflist, state}
   end
+
+  @impl GenServer
+  def handle_call(:lock?, _from, %{lock: lock} = state) do
+    {:reply, lock, state}
+  end
+
 end

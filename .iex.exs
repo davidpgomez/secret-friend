@@ -9,6 +9,6 @@ sflist
 |> SFList.add_friend("Martino")
 |> SFList.create_selection()
 
-IO.puts("Now your have your friends loaded in context")
+IO.puts("Now your have your friends loaded in context. List is called :friends")
 
-IO.puts(SFList.show(:friends))
+IO.inspect(SFList.show(:friends))
