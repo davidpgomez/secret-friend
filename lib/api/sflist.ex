@@ -14,8 +14,9 @@ defmodule SecretFriends.API.SFList do
         []
 
     """
-    def new() do
-      SFWorker.start()
+    def new(name) do
+      SFWorker.start_link(name)
+      name
     end
 
     @doc """
@@ -25,28 +26,17 @@ defmodule SecretFriends.API.SFList do
         iex> SecretFriends.API.SFList.add_friend(pid, "Jose")
         ["Jose"]
     """
-    def add_friend(pid, friend) do
-      send(pid, {:cast, {:add_friend, friend}})
-      pid
+    def add_friend(name, friend) do
+      GenServer.cast(name, {:add_friend, friend})
+      name
     end
 
-    def create_selection(pid) do
-        send(pid, {:call, self(), :create_selection})
-        handle_response()
+    def create_selection(name) do
+        GenServer.call(name, :create_selection)
     end
 
-    def show(pid) do
+    def show(name) do
       # send request to server
-      send(pid, {:call, self(), :show})
-
-      # await for response
-      handle_response()
+      GenServer.call(name, :show)
     end
-
-  defp handle_response() do
-    receive do
-      {:response, response} -> response
-      _other -> nil
-    end
-  end
 end
