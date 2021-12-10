@@ -5,12 +5,19 @@ defmodule SecretFriends.Worker.SFWorker do
   # start server
   def start_link(name) do
     # MFA (module - function - arguments)
-    GenServer.start_link(__MODULE__, %{sflist: SFList.new(), selection: nil, lock: false}, name: name)
+    GenServer.start_link(__MODULE__, name, name: name)
   end
 
   @impl GenServer
-  def init(state) do
-    {:ok, state}
+  def init(name) do
+    # search for a previous state of `name` process and retrieve it
+    case :ets.lookup(:sflist_cache, name) do
+      [] ->
+        {:ok, %{sflist: SFList.new(), selection: nil, lock: false, name: name}}
+      # use ^name to match by name value (and not override it)
+      [{^name, state}] ->
+        {:ok, state}
+    end
   end
 
   # handle_cast (msg, state) -> {:noreply, new_state}
@@ -30,20 +37,29 @@ defmodule SecretFriends.Worker.SFWorker do
   end
 
   @impl GenServer
-  def handle_cast(:lock, state) do
-    {:noreply, %{state | lock: true}}
+  def handle_cast(:lock, %{name: name} = state) do
+    new_state = %{state | lock: true}
+
+    :ets.insert(:sflist_cache, {name, new_state})
+    {:noreply, new_state}
   end
 
   @impl GenServer
-  def handle_cast(:unlock, state) do
-    {:noreply, %{state | lock: false}}
+  def handle_cast(:unlock, %{name: name} = state) do
+    new_state = %{state | lock: false}
+
+    :ets.insert(:sflist_cache, {name, new_state})
+    {:noreply, new_state}
   end
 
   # handle_call (msg, from, state) -> {:reply, response, new_state}
   @impl GenServer
-  def handle_call(:create_selection, _from, %{sflist: sflist} = state) do
+  def handle_call(:create_selection, _from, %{sflist: sflist, name: name} = state) do
     new_selection = SFList.create_selection(sflist)
-    {:reply, new_selection, %{state | sflist: sflist, selection: new_selection}}
+    new_state = %{state | selection: new_selection}
+
+    :ets.insert(:sflist_cache, {name, new_state})
+    {:reply, new_selection, new_state}
   end
 
   # handle_call (msg, from, state) -> {:reply, response, new_state}
