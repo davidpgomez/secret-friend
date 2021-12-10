@@ -3,9 +3,9 @@ defmodule SecretFriends do
 
   @impl Application
   def start(_type, _args) do
-    # create SFWorksers at application start
+    # create a list supervisor at application start
     children = [
-      {SecretFriends.Worker.SFWorker, :supervised}
+      {SecretFriends.Boundary.SFListsSupervisor, :supervised}
     ]
 
     # Create a supervisor with 1_for_1 option (if a children dies, restart only that)
